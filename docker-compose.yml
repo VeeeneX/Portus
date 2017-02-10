@@ -1,7 +1,12 @@
 version: '2'
 
+volumes:
+  portus-registry:
+
+
 services:
-  web:
+  portus-web:
+    container_name: portus-web
     build: .
     command: puma -b tcp://0.0.0.0:3000 -w 3
     environment:
@@ -12,11 +17,10 @@ services:
       - .:/portus
     ports:
       - 3000:3000
-    links:
-      - db
   
-  crono:
-    image: portus_web
+  portus-cron:
+    container_name: portus-cron
+    image: portus-web
     entrypoint: bin/crono
     environment:
       - PORTUS_MACHINE_FQDN_VALUE=${EXTERNAL_IP}
@@ -24,26 +28,24 @@ services:
       - PORTUS_DB_PASSWORD=portus
     volumes:
       - .:/portus
-    links:
-      - db
   
-  db:
+  portus-database:
+    container_name: portus-database
     image: library/mariadb:10.0.23
     environment:
       MYSQL_ROOT_PASSWORD: portus
   
   registry:
+    container_name: portus-registry
     image: library/registry:2.3.1
     environment:
       - REGISTRY_AUTH_TOKEN_REALM=http://${EXTERNAL_IP}:3000/v2/token
       - REGISTRY_AUTH_TOKEN_SERVICE=${EXTERNAL_IP}:${REGISTRY_PORT}
       - REGISTRY_AUTH_TOKEN_ISSUER=${EXTERNAL_IP}
     volumes:
-      - /registry_data
+      - portus-registry:/registry_data
       - ./compose/registry/portus.crt:/etc/docker/registry/portus.crt:ro
       - ./compose/registry/config.yml:/etc/docker/registry/config.yml:ro
     ports:
       - ${REGISTRY_PORT}:5000
       - 5001:5001 # required to access debug service
-    links:
-      - web
